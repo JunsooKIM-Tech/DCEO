@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Lotto Generator</title>
+    <style>
+        :root {
+            --color-1: #fbc400; /* 1-10 */
+            --color-11: #69c8f2; /* 11-20 */
+            --color-21: #ff7272; /* 21-30 */
+            --color-31: #aaaaaa; /* 31-40 */
+            --color-41: #b0d840; /* 41-45 */
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --accent: #4a90e2;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .date-display {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 25px;
+        }
+
+        .ball-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            min-height: 55px;
+        }
+
+        .ball {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: inset -3px -3px 8px rgba(0,0,0,0.2), 0 4px 10px rgba(0,0,0,0.1);
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .shuffling {
+            animation: shuffle 0.1s infinite;
+        }
+
+        @keyframes shuffle {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+            100% { transform: translateY(0); }
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #generate-btn {
+            background-color: var(--accent);
+            color: white;
+            box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+        }
+
+        #generate-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        #copy-btn {
+            background-color: #f0f0f0;
+            color: #333;
+            display: none;
+        }
+
+        #clear-btn {
+            background-color: transparent;
+            color: #aaa;
+            font-size: 13px;
+        }
+
+        #clear-btn:hover { color: #888; text-decoration: underline; }
+
+        .dashboard {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            text-align: left;
+        }
+
+        .section-title {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .history-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            gap: 3px;
+            margin-bottom: 6px;
+        }
+
+        .h-ball {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 9px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .stats-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .stat-badge {
+            font-size: 10px;
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: none;
+            z-index: 1000;
+        }
+
+        /* Colors */
+        .color-1 { background-color: var(--color-1); }
+        .color-11 { background-color: var(--color-11); }
+        .color-21 { background-color: var(--color-21); }
+        .color-31 { background-color: var(--color-31); }
+        .color-41 { background-color: var(--color-41); }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>LOTTO 6/45</h1>
+        <div class="date-display">추첨 예정일: 2026년 4월 18일 (토)</div>
+        
+        <div class="ball-container" id="ball-display">
+            <div style="color: #ccc; font-size: 14px;">행운을 빌어보세요!</div>
+        </div>
+
+        <div class="controls">
+            <button id="generate-btn">✨ 행운의 번호 생성</button>
+            <button id="copy-btn">📋 번호 복사하기</button>
+            <button id="clear-btn">모든 기록 삭제</button>
+        </div>
+
+        <div class="dashboard">
+            <div>
+                <div class="section-title">최근 기록</div>
+                <div id="history-list" class="history-list"></div>
+            </div>
+            <div>
+                <div class="section-title">자주 나온 숫자</div>
+                <div id="stats-list" class="stats-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">복사되었습니다!</div>
+
+    <script>
+        const ballDisplay = document.getElementById('ball-display');
+        const historyList = document.getElementById('history-list');
+        const statsList = document.getElementById('stats-list');
+        const generateBtn = document.getElementById('generate-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const toast = document.getElementById('toast');
+
+        let history = JSON.parse(localStorage.getItem('lottoHistory')) || [];
+        let currentNums = [];
+
+        function getColor(n) {
+            if (n <= 10) return 'color-1';
+            if (n <= 20) return 'color-11';
+            if (n <= 30) return 'color-21';
+            if (n <= 40) return 'color-31';
+            return 'color-41';
+        }
+
+        function updateDashboard() {
+            // History
+            historyList.innerHTML = history.slice().reverse().map(nums => `
+                <div class="history-item">
+                    ${nums.map(n => `<div class="h-ball ${getColor(n)}">${n}</div>`).join('')}
+                </div>
+            `).join('');
+
+            // Stats
+            const counts = {};
+            history.flat().forEach(n => counts[n] = (counts[n] || 0) + 1);
+            const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+            statsList.innerHTML = sorted.map(([n, c]) => `
+                <div class="stat-badge"><b>${n}</b> (${c}회)</div>
+            `).join('') || '<div style="color:#ccc; font-size:10px;">데이터 없음</div>';
+        }
+
+        async function generate() {
+            generateBtn.disabled = true;
+            copyBtn.style.display = 'none';
+            ballDisplay.innerHTML = Array(6).fill(0).map(() => '<div class="ball color-31 shuffling">?</div>').join('');
+            
+            await new Promise(r => setTimeout(r, 800));
+            
+            const nums = [];
+            while(nums.length < 6) {
+                const r = Math.floor(Math.random() * 45) + 1;
+                if(!nums.includes(r)) nums.push(r);
+            }
+            nums.sort((a,b) => a-b);
+            currentNums = nums;
+            
+            ballDisplay.innerHTML = '';
+            nums.forEach((n, i) => {
+                setTimeout(() => {
+                    const b = document.createElement('div');
+                    b.className = `ball ${getColor(n)}`;
+                    b.innerText = n;
+                    ballDisplay.appendChild(b);
+                    if(i === 5) {
+                        generateBtn.disabled = false;
+                        copyBtn.style.display = 'flex';
+                        history.push(nums);
+                        localStorage.setItem('lottoHistory', JSON.stringify(history));
+                        updateDashboard();
+                    }
+                }, i * 150);
+            });
+        }
+
+        generateBtn.addEventListener('click', generate);
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(`로또 행운 번호: ${currentNums.join(', ')}`);
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 2000);
+        });
+        clearBtn.addEventListener('click', () => {
+            if(confirm('기록을 삭제할까요?')) {
+                history = [];
+                localStorage.removeItem('lottoHistory');
+                updateDashboard();
+            }
+        });
+
+        updateDashboard();
+    </script>
+</body>
+</html>

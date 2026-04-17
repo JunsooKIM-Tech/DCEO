@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Stock Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --up-color: #f23645; /* 상승 - 빨강 */
+            --down-color: #089981; /* 하락 - 파랑/초록 (글로벌 표준 대비 한국형은 빨강/파랑) */
+            --bg-dark: #131722;
+            --card-dark: #1e222d;
+            --text-gray: #d1d4dc;
+            --border-color: #2a2e39;
+        }
+
+        /* 한국 시장 기준 색상 조정 */
+        .up { color: #ff3b30 !important; }
+        .down { color: #007aff !important; }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg-dark);
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 관심 종목 추가 폼 */
+        .add-stock-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        button.add-btn {
+            background: #2962ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* 레이아웃 구성 */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        /* 종목 리스트 */
+        .stock-list {
+            background: var(--card-dark);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .stock-item:hover { background: #2a2e39; }
+        .stock-item.active { background: #2a2e39; border-left: 4px solid #2962ff; }
+
+        .stock-info .name { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+        .stock-info .symbol { font-size: 12px; color: var(--text-gray); }
+
+        .stock-price { text-align: right; }
+        .stock-price .current { font-weight: 700; font-size: 16px; }
+        .stock-price .change { font-size: 12px; margin-top: 2px; }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #444;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 16px;
+        }
+        .delete-btn:hover { color: #ff3b30; }
+
+        /* 차트 영역 */
+        .chart-container {
+            background: var(--card-dark);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .selected-stock-info h2 { margin: 0; font-size: 28px; }
+        .selected-stock-info .details { font-size: 14px; color: var(--text-gray); margin-top: 5px; }
+
+        canvas { width: 100% !important; height: 400px !important; }
+
+        /* 애니메이션 */
+        .price-flash-up { animation: flashUp 0.5s; }
+        .price-flash-down { animation: flashDown 0.5s; }
+
+        @keyframes flashUp {
+            0% { background: rgba(255, 59, 48, 0.2); }
+            100% { background: transparent; }
+        }
+        @keyframes flashDown {
+            0% { background: rgba(0, 122, 255, 0.2); }
+            100% { background: transparent; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div class="logo">📊 SMART STOCK</div>
+            <div class="add-stock-form">
+                <input type="text" id="stock-input" placeholder="종목 코드 또는 이름 (예: 삼성전자)">
+                <button class="add-btn" id="add-btn">관심 종목 추가</button>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Left: Watchlist -->
+            <div class="stock-list" id="stock-list">
+                <!-- Items injected by JS -->
+            </div>
+
+            <!-- Right: Chart & Details -->
+            <div class="chart-container">
+                <div class="chart-header" id="chart-header">
+                    <div class="selected-stock-info">
+                        <h2 id="selected-name">---</h2>
+                        <div class="details" id="selected-price-info">
+                            <span id="selected-current">---</span> 
+                            <span id="selected-change">---</span>
+                        </div>
+                    </div>
+                    <div style="text-align: right; color: var(--text-gray); font-size: 12px;">
+                        <div id="current-date" style="margin-bottom: 4px; color: white; font-weight: 600;">2026년 4월 17일 (금)</div>
+                        <span style="color: #ff9500; font-weight: bold;">[시뮬레이션 모드]</span> 실시간 업데이트 중...
+                    </div>
+                </div>
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Google Finance 실시간 데이터 기반 (2026년 4월 17일 기준)
+        const DEFAULT_STOCKS = [
+            { name: "삼성전자", symbol: "005930", price: 216750, history: [] },
+            { name: "SK하이닉스", symbol: "000660", price: 1132000, history: [] },
+            { name: "현대차", symbol: "005380", price: 537000, history: [] },
+            { name: "NAVER", symbol: "035420", price: 215500, history: [] },
+            { name: "기아", symbol: "000270", price: 158900, history: [] }
+        ];
+
+        // [중요] 예전 잘못된 데이터를 강제로 밀어내고 새 데이터를 불러오는 로직
+        const lastUpdated = localStorage.getItem('lastStockUpdate');
+        const VERSION = "20260417_V2"; // 버전 번호를 바꿔서 강제 업데이트 유도
+
+        if (lastUpdated !== VERSION) {
+            localStorage.setItem('myStocks', JSON.stringify(DEFAULT_STOCKS));
+            localStorage.setItem('lastStockUpdate', VERSION);
+        }
+
+        let stocks = JSON.parse(localStorage.getItem('myStocks')) || DEFAULT_STOCKS;
+        let selectedIndex = 0;
+        let chart = null;
+
+        const stockListEl = document.getElementById('stock-list');
+        const stockInput = document.getElementById('stock-input');
+        const addBtn = document.getElementById('add-btn');
+
+        // 차트 초기화
+        function initChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(20).fill(''),
+                    datasets: [{
+                        label: '주가 흐름',
+                        data: [],
+                        borderColor: '#2962ff',
+                        borderWidth: 2,
+                        fill: true,
+                        backgroundColor: 'rgba(41, 98, 255, 0.1)',
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            grid: { color: '#2a2e39' },
+                            ticks: { color: '#d1d4dc' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 주가 시뮬레이션
+        function simulatePrices() {
+            stocks.forEach((stock, idx) => {
+                const changePercent = (Math.random() * 0.4 - 0.2); // -0.2% ~ +0.2%
+                const changeAmount = Math.round(stock.price * (changePercent / 100));
+                const oldPrice = stock.price;
+                stock.price += changeAmount;
+                
+                // 히스토리 업데이트 (최근 20개)
+                if (!stock.history) stock.history = [];
+                stock.history.push(stock.price);
+                if (stock.history.length > 20) stock.history.shift();
+
+                // UI 업데이트
+                updateStockItemUI(idx, oldPrice < stock.price ? 'up' : 'down');
+                
+                if (idx === selectedIndex) {
+                    updateChartHeader();
+                    updateChartData();
+                }
+            });
+        }
+
+        function updateStockItemUI(idx, direction) {
+            const item = document.querySelector(`[data-idx="${idx}"]`);
+            if (!item) return;
+
+            const stock = stocks[idx];
+            const priceEl = item.querySelector('.current');
+            const changeEl = item.querySelector('.change');
+            
+            priceEl.innerText = stock.price.toLocaleString() + '원';
+            
+            // 등락 계산 (초기 가격 대비)
+            const startPrice = stock.history[0] || stock.price;
+            const diff = stock.price - startPrice;
+            const diffPercent = ((diff / startPrice) * 100).toFixed(2);
+            
+            const sign = diff > 0 ? '▲' : (diff < 0 ? '▼' : '');
+            const colorClass = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+            
+            changeEl.innerText = `${sign} ${Math.abs(diff).toLocaleString()}원 (${diffPercent}%)`;
+            changeEl.className = `change ${colorClass}`;
+            priceEl.className = `current ${colorClass}`;
+
+            // 반짝이는 효과
+            item.classList.remove('price-flash-up', 'price-flash-down');
+            void item.offsetWidth; // 리플로우 강제
+            item.classList.add(direction === 'up' ? 'price-flash-up' : 'price-flash-down');
+        }
+
+        function renderStockList() {
+            stockListEl.innerHTML = stocks.map((stock, i) => `
+                <div class="stock-item ${i === selectedIndex ? 'active' : ''}" data-idx="${i}" onclick="selectStock(${i})">
+                    <div class="stock-info">
+                        <div class="name">${stock.name}</div>
+                        <div class="symbol">${stock.symbol}</div>
+                    </div>
+                    <div class="stock-price">
+                        <div class="current">${stock.price.toLocaleString()}원</div>
+                        <div class="change">0원 (0.00%)</div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteStock(event, ${i})">×</button>
+                </div>
+            `).join('');
+        }
+
+        function selectStock(idx) {
+            selectedIndex = idx;
+            document.querySelectorAll('.stock-item').forEach(el => el.classList.remove('active'));
+            const selectedItem = document.querySelector(`[data-idx="${idx}"]`);
+            if (selectedItem) selectedItem.classList.add('active');
+            
+            updateChartHeader();
+            updateChartData();
+        }
+
+        function updateChartHeader() {
+            const stock = stocks[selectedIndex];
+            document.getElementById('selected-name').innerText = stock.name;
+            const startPrice = stock.history[0] || stock.price;
+            const diff = stock.price - startPrice;
+            const colorClass = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+            
+            document.getElementById('selected-current').innerText = stock.price.toLocaleString() + '원';
+            document.getElementById('selected-current').className = colorClass;
+        }
+
+        function updateChartData() {
+            const stock = stocks[selectedIndex];
+            chart.data.datasets[0].data = stock.history;
+            chart.data.datasets[0].borderColor = (stock.price >= stock.history[0]) ? '#ff3b30' : '#007aff';
+            chart.data.datasets[0].backgroundColor = (stock.price >= stock.history[0]) ? 'rgba(255, 59, 48, 0.1)' : 'rgba(0, 122, 255, 0.1)';
+            chart.update('none');
+        }
+
+        function deleteStock(e, idx) {
+            e.stopPropagation();
+            stocks.splice(idx, 1);
+            if (selectedIndex >= stocks.length) selectedIndex = Math.max(0, stocks.length - 1);
+            saveAndRefresh();
+        }
+
+        function saveAndRefresh() {
+            localStorage.setItem('myStocks', JSON.stringify(stocks));
+            renderStockList();
+            if (stocks.length > 0) selectStock(selectedIndex);
+        }
+
+        addBtn.addEventListener('click', () => {
+            const val = stockInput.value.trim();
+            if (!val) return;
+            
+            const newStock = {
+                name: val,
+                symbol: Math.floor(Math.random() * 900000 + 100000).toString(),
+                price: Math.floor(Math.random() * 200000 + 10000),
+                history: []
+            };
+            
+            stocks.push(newStock);
+            stockInput.value = '';
+            saveAndRefresh();
+        });
+
+        // 엔터키 지원
+        stockInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addBtn.click();
+        });
+
+        // 초기화 실행
+        initChart();
+        renderStockList();
+        if (stocks.length > 0) selectStock(0);
+
+        // 2초마다 가격 변동 시뮬레이션
+        setInterval(simulatePrices, 2000);
+
+    </script>
+</body>
+</html>
